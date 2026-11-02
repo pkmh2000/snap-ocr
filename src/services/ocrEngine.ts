@@ -4,8 +4,58 @@ import { CropBox, OCRLanguage } from '../types';
 let cachedWorker: any = null;
 let currentLoadedLang: string | null = null;
 
+export type PreprocessMode = 'enhanced' | 'binarized' | 'none';
+
+export interface PreprocessOptions {
+  mode?: PreprocessMode;
+  sharpen?: boolean;
+}
+
 export interface ProgressCallback {
   (status: string, progress: number): void;
+}
+
+/**
+ * Computes Otsu's optimal global binarization threshold
+ * by maximizing between-class variance.
+ */
+function computeOtsuThreshold(grayData: Uint8Array): number {
+  const histogram = new Uint32Array(256);
+  const total = grayData.length;
+
+  for (let i = 0; i < total; i++) {
+    histogram[grayData[i]]++;
+  }
+
+  let sum = 0;
+  for (let t = 0; t < 256; t++) {
+    sum += t * histogram[t];
+  }
+
+  let sumB = 0;
+  let wB = 0;
+  let wF = 0;
+  let varMax = 0;
+  let threshold = 128;
+
+  for (let t = 0; t < 256; t++) {
+    wB += histogram[t];
+    if (wB === 0) continue;
+    wF = total - wB;
+    if (wF === 0) break;
+
+    sumB += t * histogram[t];
+    const mB = sumB / wB;
+    const mF = (sum - sumB) / wF;
+    const varBetween = wB * wF * (mB - mF) * (mB - mF);
+
+    if (varBetween > varMax) {
+      varMax = varBetween;
+      threshold = t;
+    }
+  }
+
+  return threshold;
 }
 
 /**
@@ -18,31 +68,24 @@ export function filterNonTextAndIconNoise(rawText: string): string {
   const lines = rawText.split('\n');
   const filteredLines: string[] = [];
 
-  // Regex for valid linguistic text: Chinese characters (\u4e00-\u9fa5), latin letters, or digits
   const hasValidTextRegex = /[\u4e00-\u9fa5a-zA-Z0-9]/;
 
   for (const rawLine of lines) {
     let line = rawLine.trim();
     if (!line) continue;
 
-    // 1. Drop lines that contain zero alphanumeric or Chinese characters (e.g. pure icons/symbols like | _ ~ - • > < * #)
     if (!hasValidTextRegex.test(line)) {
       continue;
     }
 
-    // 2. Remove typical icon misrecognition garbage at line start/end
     line = line.replace(/^[|_~^•*<>+=—\-·\\/[\](){}:;,\s]+/, '');
     line = line.replace(/[|_~^•*<>+=—\-·\\/[\](){}:;\s]+$/, '');
 
-    // 3. Drop single isolated symbols
     if (line.length <= 1 && !/[\u4e00-\u9fa5a-zA-Z0-9]/.test(line)) {
       continue;
     }
 
-    // 4. Clean repeated decorative dividers (e.g. "|||", "----", "_____")
     line = line.replace(/[|_~—\-]{2,}/g, ' ');
-
-    // 5. Clean up multiple whitespaces
     line = line.replace(/\s{2,}/g, ' ').trim();
 
     if (line.length > 0 && hasValidTextRegex.test(line)) {
@@ -55,18 +98,15 @@ export function filterNonTextAndIconNoise(rawText: string): string {
 
 /**
  * Preprocesses and crops a region from an HTMLVideoElement or HTMLImageElement
- * with precise viewport-to-natural coordinate translation accounting for object-fit (cover / contain).
+ * with viewport-to-natural coordinate translation and image optimization
+ * (Grayscale, Otsu Binarization, Contrast Stretch, and Text Sharpening).
  */
 export function cropAndPreprocessImage(
   source: HTMLVideoElement | HTMLImageElement,
   box: CropBox,
   containerSize?: { width: number; height: number },
   objectFit: 'cover' | 'contain' = 'cover',
-  options: {
-    enhanceContrast?: boolean;
-    binarize?: boolean;
-    removeNoise?: boolean;
-  } = { enhanceContrast: true, binarize: false, removeNoise: true }
+  options: PreprocessOptions = { mode: 'enhanced', sharpen: true }
 ): { canvas: HTMLCanvasElement; dataUrl: string } {
   const isVideo = source instanceof HTMLVideoElement;
   const naturalWidth = isVideo ? source.videoWidth : source.naturalWidth;
@@ -84,7 +124,6 @@ export function cropAndPreprocessImage(
   if (containerSize && containerSize.width > 0 && containerSize.height > 0) {
     const { width: cWidth, height: cHeight } = containerSize;
 
-    // Calculate scale and offset applied by CSS object-fit
     let scale: number;
     if (objectFit === 'cover') {
       scale = Math.max(cWidth / naturalWidth, cHeight / naturalHeight);
@@ -121,14 +160,17 @@ export function cropAndPreprocessImage(
 
   const canvas = document.createElement('canvas');
   // Upscale if crop is too small (greatly improves OCR for tiny fonts)
-  const minDimension = 320;
+  const minDimension = 360;
   let renderScale = 1;
   if (pixelWidth < minDimension || pixelHeight < minDimension) {
     renderScale = Math.min(3, Math.max(minDimension / pixelWidth, minDimension / pixelHeight));
   }
 
-  canvas.width = Math.max(1, Math.round(pixelWidth * renderScale));
-  canvas.height = Math.max(1, Math.round(pixelHeight * renderScale));
+  const targetWidth = Math.max(1, Math.round(pixelWidth * renderScale));
+  const targetHeight = Math.max(1, Math.round(pixelHeight * renderScale));
+
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
 
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('無法取得 2D Canvas 繪製環境');
@@ -136,7 +178,7 @@ export function cropAndPreprocessImage(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  // Draw exactly the mapped slice
+  // Draw slice
   ctx.drawImage(
     source,
     pixelX,
@@ -145,47 +187,110 @@ export function cropAndPreprocessImage(
     pixelHeight,
     0,
     0,
-    canvas.width,
-    canvas.height
+    targetWidth,
+    targetHeight
   );
 
-  // Apply contrast and noise reduction
-  if (options.enhanceContrast || options.binarize) {
+  const mode = options.mode || 'enhanced';
+
+  // Perform Image Preprocessing
+  if (mode !== 'none') {
     try {
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const imgData = ctx.getImageData(0, 0, targetWidth, targetHeight);
       const data = imgData.data;
+      const numPixels = targetWidth * targetHeight;
+      const gray = new Uint8Array(numPixels);
 
-      let minLum = 255;
-      let maxLum = 0;
-
-      for (let i = 0; i < data.length; i += 4) {
-        const lum = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-        if (lum < minLum) minLum = lum;
-        if (lum > maxLum) maxLum = lum;
+      // 1. Grayscale Conversion
+      for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+        // Luminance: 0.299R + 0.587G + 0.114B
+        gray[p] = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
       }
 
-      const lumRange = maxLum - minLum || 1;
-      const threshold = minLum + lumRange * 0.5;
+      // 2. Histogram Analysis for Robust Contrast Stretching (1% and 99% Percentiles)
+      const hist = new Uint32Array(256);
+      for (let p = 0; p < numPixels; p++) {
+        hist[gray[p]]++;
+      }
 
-      for (let i = 0; i < data.length; i += 4) {
-        const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        const stretched = ((lum - minLum) / lumRange) * 255;
+      const p1Count = Math.floor(numPixels * 0.015);
+      const p99Count = Math.floor(numPixels * 0.985);
+      let cumulative = 0;
+      let minVal = 0;
+      let maxVal = 255;
 
-        if (options.binarize) {
-          const val = stretched > threshold ? 255 : 0;
-          data[i] = val;
-          data[i + 1] = val;
-          data[i + 2] = val;
-        } else if (options.enhanceContrast) {
-          data[i] = stretched;
-          data[i + 1] = stretched;
-          data[i + 2] = stretched;
+      for (let i = 0; i < 256; i++) {
+        cumulative += hist[i];
+        if (cumulative <= p1Count) minVal = i;
+        if (cumulative >= p99Count && maxVal === 255) maxVal = i;
+      }
+      if (maxVal <= minVal) maxVal = minVal + 1;
+
+      // Contrast Stretched Grayscale
+      const stretched = new Uint8Array(numPixels);
+      const range = maxVal - minVal;
+      for (let p = 0; p < numPixels; p++) {
+        const val = gray[p];
+        if (val <= minVal) stretched[p] = 0;
+        else if (val >= maxVal) stretched[p] = 255;
+        else stretched[p] = Math.round(((val - minVal) / range) * 255);
+      }
+
+      // 3. Mode Branching: Binarization vs Enhanced Grayscale
+      if (mode === 'binarized') {
+        const otsuThreshold = computeOtsuThreshold(stretched);
+
+        // Check polarity: count how many pixels are dark vs bright
+        let darkCount = 0;
+        for (let p = 0; p < numPixels; p++) {
+          if (stretched[p] < otsuThreshold) darkCount++;
+        }
+        // If more than 55% pixels are dark, text is probably white on dark background -> invert!
+        const isInverted = darkCount > numPixels * 0.55;
+
+        for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+          let bVal: number;
+          if (isInverted) {
+            // White text becomes black (0), dark background becomes white (255)
+            bVal = stretched[p] >= otsuThreshold ? 0 : 255;
+          } else {
+            // Standard dark text on light background
+            bVal = stretched[p] < otsuThreshold ? 0 : 255;
+          }
+          data[i] = bVal;
+          data[i + 1] = bVal;
+          data[i + 2] = bVal;
+        }
+      } else {
+        // 'enhanced' Mode: Stretched Grayscale + Unsharp Stroke Sharpening
+        const sharpen = options.sharpen !== false;
+        for (let y = 0; y < targetHeight; y++) {
+          for (let x = 0; x < targetWidth; x++) {
+            const p = y * targetWidth + x;
+            const idx = p * 4;
+
+            let pixelValue = stretched[p];
+
+            if (sharpen && x > 0 && x < targetWidth - 1 && y > 0 && y < targetHeight - 1) {
+              // 3x3 Sharpen Kernel: center 3.0, neighbors -0.5
+              const up = stretched[(y - 1) * targetWidth + x];
+              const down = stretched[(y + 1) * targetWidth + x];
+              const left = stretched[y * targetWidth + (x - 1)];
+              const right = stretched[y * targetWidth + (x + 1)];
+              const sharpVal = 3.0 * pixelValue - 0.5 * (up + down + left + right);
+              pixelValue = Math.max(0, Math.min(255, Math.round(sharpVal)));
+            }
+
+            data[idx] = pixelValue;
+            data[idx + 1] = pixelValue;
+            data[idx + 2] = pixelValue;
+          }
         }
       }
 
       ctx.putImageData(imgData, 0, 0);
     } catch {
-      // Proceed if canvas reading is restricted
+      // Fallback to original crop if canvas processing is restricted
     }
   }
 
@@ -232,7 +337,6 @@ export async function recognizeTextLocally(
 
     const rawText = result?.data?.text || '';
     
-    // Apply icon & non-text filtering if enabled
     let cleanedText = rawText;
     if (options.filterIconsAndNoise) {
       cleanedText = filterNonTextAndIconNoise(rawText);

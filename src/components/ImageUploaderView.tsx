@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Camera, Clipboard, Copy, Image as ImageIcon, Sparkles, Upload } from 'lucide-react';
 import { CropBox, OCRLanguage } from '../types';
-import { cropAndPreprocessImage, recognizeTextLocally } from '../services/ocrEngine';
+import { cropAndPreprocessImage, recognizeTextLocally, PreprocessMode } from '../services/ocrEngine';
 
 interface ImageUploaderViewProps {
   language: OCRLanguage;
@@ -38,7 +38,7 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [progressStatus, setProgressStatus] = useState<string>('');
   const [progressPercent, setProgressPercent] = useState<number>(0);
-  const [enhanceContrast, setEnhanceContrast] = useState<boolean>(true);
+  const [preprocessMode, setPreprocessMode] = useState<PreprocessMode>('enhanced');
   const [filterIcons, setFilterIcons] = useState<boolean>(true);
   const [showHint, setShowHint] = useState<boolean>(true);
 
@@ -169,8 +169,8 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
         containerSize,
         'contain',
         {
-          enhanceContrast,
-          binarize: false,
+          mode: preprocessMode,
+          sharpen: true,
         }
       );
 
@@ -207,7 +207,7 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
   };
 
   return (
-    <div className="relative flex flex-col w-full h-[calc(100vh-4rem)] max-h-[880px] bg-slate-950 overflow-hidden select-none">
+    <div className="relative flex-1 min-h-0 w-full flex flex-col bg-slate-950 overflow-hidden select-none justify-between">
       {/* Top Bar */}
       <div className="absolute top-3 left-3 right-3 z-30 flex items-center justify-between gap-2 pointer-events-auto">
         <div className="flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md border border-slate-700/60 rounded-full px-2.5 py-1 text-xs shadow-lg">
@@ -374,34 +374,62 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
 
       {/* Bottom Controls */}
       {imageUrl && (
-        <div className="relative z-30 flex flex-col gap-2.5 px-4 pt-3 pb-5 bg-slate-950 border-t border-slate-800">
-          <div className="flex items-center justify-between">
+        <div className="relative z-30 shrink-0 flex flex-col gap-2 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0.75rem))] bg-slate-950/95 border-t border-slate-800 backdrop-blur-md">
+          {/* Row 1: Change photo & Filter Icons */}
+          <div className="flex items-center justify-between gap-2">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="text-xs text-slate-400 hover:text-white underline underline-offset-4"
+              className="text-xs text-sky-400 hover:text-sky-300 underline underline-offset-4"
             >
               更換照片
             </button>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filterIcons}
-                  onChange={(e) => setFilterIcons(e.target.checked)}
-                  className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0"
-                />
-                <span className="text-sky-300 font-medium">過濾圖標/雜訊</span>
-              </label>
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={filterIcons}
+                onChange={(e) => setFilterIcons(e.target.checked)}
+                className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0 w-3.5 h-3.5"
+              />
+              <span className="text-sky-300 font-medium">過濾圖標/雜訊</span>
+            </label>
+          </div>
 
-              <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={enhanceContrast}
-                  onChange={(e) => setEnhanceContrast(e.target.checked)}
-                  className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0"
-                />
-                <span>高對比</span>
-              </label>
+          {/* Row 2: Preprocess Mode Selector */}
+          <div className="flex items-center justify-between gap-1.5 bg-slate-900/60 p-1 rounded-lg border border-slate-800/80 text-[11px]">
+            <span className="text-slate-400 font-medium whitespace-nowrap pl-1">影像預處理:</span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPreprocessMode('enhanced')}
+                className={`px-2 py-0.5 rounded transition whitespace-nowrap font-medium ${
+                  preprocessMode === 'enhanced'
+                    ? 'bg-sky-500 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="灰階轉換 + 對比拉伸 + 字元銳化"
+              >
+                智慧增強 (灰階+銳化)
+              </button>
+              <button
+                onClick={() => setPreprocessMode('binarized')}
+                className={`px-2 py-0.5 rounded transition whitespace-nowrap font-medium ${
+                  preprocessMode === 'binarized'
+                    ? 'bg-sky-500 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="大津法自動黑白二值化"
+              >
+                黑白二值化
+              </button>
+              <button
+                onClick={() => setPreprocessMode('none')}
+                className={`px-2 py-0.5 rounded transition whitespace-nowrap font-medium ${
+                  preprocessMode === 'none'
+                    ? 'bg-sky-500 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                原圖
+              </button>
             </div>
           </div>
 
@@ -420,27 +448,29 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
             </div>
           )}
 
-          <button
-            onClick={handlePerformOCR}
-            disabled={isProcessing}
-            className={`w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-2xl font-semibold text-base shadow-lg transition active:scale-[0.98] ${
-              isProcessing
-                ? 'bg-sky-700/60 text-sky-200 cursor-not-allowed'
-                : 'bg-gradient-to-r from-sky-500 via-sky-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-sky-500/25 ring-2 ring-sky-400/30'
-            }`}
-          >
-            {isProcessing ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>正在本地辨識中...</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-5 h-5 text-sky-200" />
-                <span>辨識框選區 (自動複製至剪貼簿)</span>
-              </>
-            )}
-          </button>
+          <div className="w-full pt-0.5">
+            <button
+              onClick={handlePerformOCR}
+              disabled={isProcessing}
+              className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold text-sm sm:text-base shadow-lg transition active:scale-[0.98] ${
+                isProcessing
+                  ? 'bg-sky-700/60 text-sky-200 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-sky-500 via-sky-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-sky-500/25 ring-2 ring-sky-400/30'
+              }`}
+            >
+              {isProcessing ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>正在本地辨識中...</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 text-sky-200" />
+                  <span>辨識框選區 (自動複製至剪貼簿)</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
     </div>

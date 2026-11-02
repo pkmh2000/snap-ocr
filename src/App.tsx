@@ -106,7 +106,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-slate-950 text-slate-100 overflow-hidden font-sans">
+    <div className="flex flex-col h-[100dvh] w-full bg-slate-950 text-slate-100 overflow-hidden font-sans">
       {/* Top Application Navigation Bar */}
       <header className="relative z-40 flex items-center justify-between px-3.5 py-2.5 bg-slate-900/95 backdrop-blur-md border-b border-slate-800/80 shrink-0">
         <div className="flex items-center gap-2">
