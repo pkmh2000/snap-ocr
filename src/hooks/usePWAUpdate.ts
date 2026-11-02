@@ -2,17 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { VersionInfo } from '../types';
 
 export const CURRENT_VERSION_INFO: VersionInfo = {
-  version: 'v0.9.8-beta',
+  version: 'v0.9.9-beta',
   buildDate: '2026-11-02',
   isBeta: true,
   channel: 'beta',
   releaseNotes: [
-    '✨ 支援手機相機即時畫面動態框選與即時裁切',
-    '⚡ 內建 Tesseract.js 純前端離線 OCR，零延遲零伺服器消耗',
-    '📋 辨識後全自動直接寫入系統剪貼簿，並提供觸覺微震動回饋',
-    '📦 完整 PWA 離線支援與 GitHub Pages 靜態託管架構',
-    '🔄 內建版本資訊檢視、線上檢查更新與一鍵立即更新機制',
-    '🖼️ 支援相簿截圖導入與剪貼簿圖片一鍵貼上框選'
+    '🔘 將相機/截圖切換鍵移至頂部導航列並改為圖標，不再遮蔽辨識按鈕',
+    '🎯 修復選取框與底層鏡頭幾何縮放偏移，達成像素級準確對齊',
+    '🚫 內建智慧過濾演算法，自動排除 Icon、小圖標與非文字雜訊',
+    '👁️ 觸控微調框選區時自動隱藏提示文字，視線 100% 清晰無遮蔽',
+    '📱 優化手機相簿截圖導入與剪貼簿貼上操作說明',
+    '⚡ 升級 Tesseract.js 離線高對比文字增強與自動複製至剪貼簿'
   ]
 };
 

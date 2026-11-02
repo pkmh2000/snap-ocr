@@ -334,25 +334,39 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
             <div className="w-16 h-16 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center mb-4 text-sky-400">
               <ImageIcon className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">導入手機截圖或照片</h3>
-            <p className="text-sm text-slate-400 mb-6">
-              支援直接貼上剪貼簿截圖，或從相簿選取照片進行精確框選 OCR
+            <h3 className="text-lg font-semibold text-white mb-1">導入手機截圖或照片</h3>
+            <p className="text-xs text-slate-400 mb-5">
+              可直接從手機相簿載入截圖，或貼上剪貼簿圖片進行框選辨識
             </p>
 
-            <div className="flex flex-col gap-3 w-full">
-              <button
-                onClick={handlePasteFromClipboard}
-                className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm transition shadow-lg shadow-sky-600/20"
-              >
-                <Clipboard className="w-4 h-4" /> 貼上剪貼簿截圖
-              </button>
-
+            <div className="flex flex-col gap-2.5 w-full">
+              {/* Primary button: Open Photo Gallery */}
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm border border-slate-700 transition"
+                className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-semibold text-sm transition shadow-lg shadow-sky-600/25 active:scale-[0.98]"
               >
-                <Upload className="w-4 h-4" /> 從相簿選取截圖檔案
+                <Upload className="w-4 h-4" /> 開啟手機相簿選取截圖
               </button>
+
+              {/* Secondary button: Paste clipboard image */}
+              <button
+                onClick={handlePasteFromClipboard}
+                className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs border border-slate-700 transition active:scale-[0.98]"
+              >
+                <Clipboard className="w-3.5 h-3.5 text-sky-400" /> 貼上已複製的截圖 (剪貼簿)
+              </button>
+            </div>
+
+            {/* Mobile screenshot tip card */}
+            <div className="mt-5 p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-left w-full space-y-1.5">
+              <span className="text-[11px] font-semibold text-sky-300 flex items-center gap-1.5">
+                📱 手機截圖操作說明：
+              </span>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                1. 手機按<strong>「電源鍵 + 音量鍵」</strong>進行螢幕截圖。<br />
+                2. 回到此 App 點上方<strong>「開啟手機相簿」</strong>，選取第一張剛截好的圖。<br />
+                3. 手指框選目標文字，自動完成 OCR 並複製到剪貼簿！
+              </p>
             </div>
           </div>
         )}

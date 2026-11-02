@@ -135,7 +135,33 @@ export default function App() {
         </div>
 
         {/* Right Action Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Mode switch icon pill in header - doesn't block camera or bottom buttons */}
+          <div className="flex items-center p-0.5 rounded-xl bg-slate-800/90 border border-slate-700/60 shadow-sm">
+            <button
+              onClick={() => setActiveTab('camera')}
+              className={`p-1.5 rounded-lg transition ${
+                activeTab === 'camera'
+                  ? 'bg-sky-500 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="切換至相機即時框選"
+            >
+              <Camera className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setActiveTab('upload')}
+              className={`p-1.5 rounded-lg transition ${
+                activeTab === 'upload'
+                  ? 'bg-sky-500 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="切換至相簿截圖導入"
+            >
+              <ImageIcon className="w-4 h-4" />
+            </button>
+          </div>
+
           {/* PWA Install Button (Chromium / iOS Safari) */}
           <PWAInstallButton />
 
@@ -181,34 +207,6 @@ export default function App() {
             onSwitchToCamera={() => setActiveTab('camera')}
           />
         )}
-
-        {/* Floating Mode Switch Pill (Always accessible at bottom-left) */}
-        <div className="absolute bottom-24 left-4 z-30 pointer-events-auto">
-          <div className="flex items-center p-1 rounded-full bg-slate-900/90 backdrop-blur-md border border-slate-700/80 shadow-xl">
-            <button
-              onClick={() => setActiveTab('camera')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition ${
-                activeTab === 'camera'
-                  ? 'bg-sky-500 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Camera className="w-3.5 h-3.5" />
-              相機框選
-            </button>
-            <button
-              onClick={() => setActiveTab('upload')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition ${
-                activeTab === 'upload'
-                  ? 'bg-sky-500 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <ImageIcon className="w-3.5 h-3.5" />
-              截圖導入
-            </button>
-          </div>
-        </div>
       </main>
 
       {/* Floating Auto-Copy Toast */}
