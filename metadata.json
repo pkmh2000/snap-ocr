@@ -1,0 +1,7 @@
+{
+  "name": "SnapOCR 框選相機 OCR 工具 (Beta)",
+  "description": "相機即時框選與本地離線 OCR 文字辨識工具，自動複製至剪貼簿，支援 PWA 安裝與更新。",
+  "requestFramePermissions": ["camera", "clipboard-read", "clipboard-write"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

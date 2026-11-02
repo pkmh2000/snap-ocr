@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-Hant" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>SnapOCR 框選相機 OCR 工具 (Beta)</title>
+    <meta name="description" content="手機相機即時框選與本地離線 OCR 文字辨識工具，自動複製至剪貼簿，支援 PWA 安裝與更新。" />
+    
+    <!-- PWA & Mobile Web App Meta -->
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SnapOCR" />
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    
+    <!-- OpenGraph & Twitter -->
+    <meta property="og:title" content="SnapOCR 框選相機 OCR 工具 (Beta)" />
+    <meta property="og:description" content="相機即時框選與本地離線 OCR 文字辨識工具，自動複製至剪貼簿，支援 PWA 安裝與更新。" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    
+    <!-- Anti-flicker background color -->
+    <style>
+      body {
+        background-color: #090d16;
+        color: #f8fafc;
+        overscroll-behavior-y: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-950 text-slate-100 min-h-screen selection:bg-sky-500 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>
