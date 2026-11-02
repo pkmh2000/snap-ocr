@@ -149,10 +149,21 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
       setProgressStatus('正在截取框選區域...');
       setProgressPercent(0.15);
 
-      const { canvas, dataUrl } = cropAndPreprocessImage(imageRef.current, cropBox, {
-        enhanceContrast,
-        binarize: false,
-      });
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      const containerSize = containerRect
+        ? { width: containerRect.width, height: containerRect.height }
+        : undefined;
+
+      const { canvas, dataUrl } = cropAndPreprocessImage(
+        imageRef.current,
+        cropBox,
+        containerSize,
+        'contain',
+        {
+          enhanceContrast,
+          binarize: false,
+        }
+      );
 
       const { text, confidence } = await recognizeTextLocally(
         canvas,

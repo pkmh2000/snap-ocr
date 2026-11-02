@@ -247,11 +247,22 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
       setProgressStatus('正在截取框選區域...');
       setProgressPercent(0.15);
 
-      // Crop the target region
-      const { canvas, dataUrl } = cropAndPreprocessImage(videoRef.current, cropBox, {
-        enhanceContrast,
-        binarize: false,
-      });
+      // Crop the target region with exact screen-to-camera coordinate alignment
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      const containerSize = containerRect
+        ? { width: containerRect.width, height: containerRect.height }
+        : undefined;
+
+      const { canvas, dataUrl } = cropAndPreprocessImage(
+        videoRef.current,
+        cropBox,
+        containerSize,
+        'cover',
+        {
+          enhanceContrast,
+          binarize: false,
+        }
+      );
 
       // Local offline OCR
       const { text, confidence } = await recognizeTextLocally(
