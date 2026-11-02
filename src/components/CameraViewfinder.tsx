@@ -81,6 +81,12 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
         },
       };
 
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        setCameraError('當前環境未支援相機存取（請確認使用 HTTPS 或 Safari/Chrome 開啟）。您可點擊下方改用「截圖/相片導入」！');
+        setCameraActive(false);
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
 
