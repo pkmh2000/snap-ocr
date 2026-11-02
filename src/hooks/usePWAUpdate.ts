@@ -2,17 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { VersionInfo } from '../types';
 
 export const CURRENT_VERSION_INFO: VersionInfo = {
-  version: 'v1.0.0-beta',
+  version: 'v1.0.1-beta',
   buildDate: '2026-11-02',
   isBeta: true,
   channel: 'beta',
   releaseNotes: [
+    '🔍 支援相機即時光學/數位鏡頭縮放 (1x / 1.5x / 2x / 3x)，看清遠處或微小字體',
     '✨ 實作進階影像預處理：支援灰階轉換、大津法(Otsu)黑白二值化、對比度拉伸與字元銳化',
     '📱 解決手機版辨識按鈕超出螢幕邊緣問題，適配 100dvh 與安全區域 (Safe Area)',
     '🔘 將相機/截圖切換鍵移至頂部導航列並改為圖標，不再遮蔽辨識按鈕',
     '🎯 修復選取框與底層鏡頭幾何縮放偏移，達成像素級準確對齊',
-    '🚫 內建智慧過濾演算法，自動排除 Icon、小圖標與非文字雜訊',
-    '👁️ 觸控微調框選區時自動隱藏提示文字，視線 100% 清晰無遮蔽'
+    '🚫 內建智慧過濾演算法，自動排除 Icon、小圖標與非文字雜訊'
   ]
 };
 

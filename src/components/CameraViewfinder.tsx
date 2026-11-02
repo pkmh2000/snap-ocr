@@ -66,6 +66,10 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
   const [filterIcons, setFilterIcons] = useState<boolean>(true);
   const [showHint, setShowHint] = useState<boolean>(true);
 
+  // Camera Zoom state (Hardware or Software Digital Zoom)
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  const [hasHardwareZoom, setHasHardwareZoom] = useState<boolean>(false);
+
   // Auto-dismiss the center hint after 2.5s
   useEffect(() => {
     const timer = setTimeout(() => setShowHint(false), 2500);
@@ -106,10 +110,17 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
       setCameraActive(true);
       setIsFrozen(false);
 
-      // Check for torch capability
+      // Check capabilities (Torch & Hardware Zoom)
       const track = stream.getVideoTracks()[0];
       const capabilities = (track.getCapabilities?.() as any) || {};
       setHasTorch(Boolean(capabilities.torch));
+
+      if (capabilities.zoom) {
+        setHasHardwareZoom(true);
+      } else {
+        setHasHardwareZoom(false);
+      }
+      setZoomLevel(1.0);
     } catch (err: any) {
       console.error('Camera access error:', err);
       let msg = '無法取得相機權限。請確認瀏覽器已允許使用相機。';
@@ -164,6 +175,21 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
   // Switch Camera facing mode
   const switchCamera = () => {
     setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
+  };
+
+  // Adjust Zoom (Hardware optical/sensor zoom or CSS digital zoom)
+  const handleSetZoom = async (level: number) => {
+    setZoomLevel(level);
+    if (hasHardwareZoom && streamRef.current) {
+      const track = streamRef.current.getVideoTracks()[0];
+      try {
+        await (track as any).applyConstraints({
+          advanced: [{ zoom: level }],
+        });
+      } catch (err) {
+        console.warn('Hardware zoom constraint error, fallback to digital zoom', err);
+      }
+    }
   };
 
   // Handle touch / mouse dragging and resizing of the crop box
@@ -262,6 +288,8 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
         ? { width: containerRect.width, height: containerRect.height }
         : undefined;
 
+      const softwareZoom = hasHardwareZoom ? 1.0 : zoomLevel;
+
       const { canvas, dataUrl } = cropAndPreprocessImage(
         videoRef.current,
         cropBox,
@@ -270,7 +298,8 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
         {
           mode: preprocessMode,
           sharpen: true,
-        }
+        },
+        softwareZoom
       );
 
       // Local offline OCR with optional non-text/icon noise filtering
@@ -378,16 +407,40 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
         onPointerCancel={handlePointerUp}
         className="relative flex-1 w-full h-full overflow-hidden flex items-center justify-center bg-black cursor-crosshair touch-none"
       >
-        {/* Live Camera Video Feed */}
+        {/* Live Camera Video Feed with hardware or digital zoom */}
         <video
           ref={videoRef}
           playsInline
           autoPlay
           muted
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
+          style={{
+            transform: !hasHardwareZoom && zoomLevel > 1 ? `scale(${zoomLevel})` : undefined,
+            transformOrigin: 'center center',
+          }}
+          className={`w-full h-full object-cover transition-transform duration-200 ${
             cameraActive ? 'opacity-100' : 'opacity-0'
           }`}
         />
+
+        {/* Floating Camera Zoom Selector (1x, 1.5x, 2x, 3x) */}
+        {cameraActive && !cameraError && (
+          <div className="absolute right-2.5 bottom-4 z-30 flex flex-col items-center gap-1.5 p-1 rounded-2xl bg-slate-950/80 backdrop-blur-md border border-slate-700/60 shadow-xl pointer-events-auto">
+            {[1.0, 1.5, 2.0, 3.0].map((lvl) => (
+              <button
+                key={lvl}
+                onClick={() => handleSetZoom(lvl)}
+                className={`w-7 h-7 rounded-xl text-[10px] font-bold transition flex items-center justify-center ${
+                  zoomLevel === lvl
+                    ? 'bg-amber-400 text-slate-950 shadow-md scale-105'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                }`}
+                title={`縮放至 ${lvl} 倍`}
+              >
+                {lvl}x
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Camera Permission / Error Fallback */}
         {cameraError && (

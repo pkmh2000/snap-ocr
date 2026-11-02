@@ -106,7 +106,8 @@ export function cropAndPreprocessImage(
   box: CropBox,
   containerSize?: { width: number; height: number },
   objectFit: 'cover' | 'contain' = 'cover',
-  options: PreprocessOptions = { mode: 'enhanced', sharpen: true }
+  options: PreprocessOptions = { mode: 'enhanced', sharpen: true },
+  zoomFactor: number = 1.0
 ): { canvas: HTMLCanvasElement; dataUrl: string } {
   const isVideo = source instanceof HTMLVideoElement;
   const naturalWidth = isVideo ? source.videoWidth : source.naturalWidth;
@@ -124,12 +125,14 @@ export function cropAndPreprocessImage(
   if (containerSize && containerSize.width > 0 && containerSize.height > 0) {
     const { width: cWidth, height: cHeight } = containerSize;
 
-    let scale: number;
+    let baseScale: number;
     if (objectFit === 'cover') {
-      scale = Math.max(cWidth / naturalWidth, cHeight / naturalHeight);
+      baseScale = Math.max(cWidth / naturalWidth, cHeight / naturalHeight);
     } else {
-      scale = Math.min(cWidth / naturalWidth, cHeight / naturalHeight);
+      baseScale = Math.min(cWidth / naturalWidth, cHeight / naturalHeight);
     }
+
+    const scale = baseScale * (zoomFactor || 1.0);
 
     const renderedWidth = naturalWidth * scale;
     const renderedHeight = naturalHeight * scale;

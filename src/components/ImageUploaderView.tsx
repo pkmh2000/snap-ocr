@@ -41,6 +41,7 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
   const [preprocessMode, setPreprocessMode] = useState<PreprocessMode>('enhanced');
   const [filterIcons, setFilterIcons] = useState<boolean>(true);
   const [showHint, setShowHint] = useState<boolean>(true);
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
 
   // Auto-dismiss the center hint after 2.5s
   React.useEffect(() => {
@@ -171,7 +172,8 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
         {
           mode: preprocessMode,
           sharpen: true,
-        }
+        },
+        zoomLevel
       );
 
       // Local offline OCR with optional non-text/icon noise filtering
@@ -255,8 +257,30 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
               ref={imageRef}
               src={imageUrl}
               alt="待框選截圖"
-              className="w-full h-full object-contain pointer-events-none"
+              style={{
+                transform: zoomLevel > 1 ? `scale(${zoomLevel})` : undefined,
+                transformOrigin: 'center center',
+              }}
+              className="w-full h-full object-contain pointer-events-none transition-transform duration-200"
             />
+
+            {/* Floating Zoom Selector (1x, 1.5x, 2x, 3x) */}
+            <div className="absolute right-2.5 bottom-4 z-30 flex flex-col items-center gap-1.5 p-1 rounded-2xl bg-slate-950/80 backdrop-blur-md border border-slate-700/60 shadow-xl pointer-events-auto">
+              {[1.0, 1.5, 2.0, 3.0].map((lvl) => (
+                <button
+                  key={lvl}
+                  onClick={() => setZoomLevel(lvl)}
+                  className={`w-7 h-7 rounded-xl text-[10px] font-bold transition flex items-center justify-center ${
+                    zoomLevel === lvl
+                      ? 'bg-amber-400 text-slate-950 shadow-md scale-105'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                  }`}
+                  title={`縮放至 ${lvl} 倍`}
+                >
+                  {lvl}x
+                </button>
+              ))}
+            </div>
 
             {/* Dark Mask */}
             <div
