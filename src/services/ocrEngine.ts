@@ -9,6 +9,51 @@ export interface ProgressCallback {
 }
 
 /**
+ * Intelligent filter to remove icons, visual symbols, stray dividers,
+ * and non-text noise from OCR outputs.
+ */
+export function filterNonTextAndIconNoise(rawText: string): string {
+  if (!rawText) return '';
+
+  const lines = rawText.split('\n');
+  const filteredLines: string[] = [];
+
+  // Regex for valid linguistic text: Chinese characters (\u4e00-\u9fa5), latin letters, or digits
+  const hasValidTextRegex = /[\u4e00-\u9fa5a-zA-Z0-9]/;
+
+  for (const rawLine of lines) {
+    let line = rawLine.trim();
+    if (!line) continue;
+
+    // 1. Drop lines that contain zero alphanumeric or Chinese characters (e.g. pure icons/symbols like | _ ~ - • > < * #)
+    if (!hasValidTextRegex.test(line)) {
+      continue;
+    }
+
+    // 2. Remove typical icon misrecognition garbage at line start/end
+    line = line.replace(/^[|_~^•*<>+=—\-·\\/[\](){}:;,\s]+/, '');
+    line = line.replace(/[|_~^•*<>+=—\-·\\/[\](){}:;\s]+$/, '');
+
+    // 3. Drop single isolated symbols
+    if (line.length <= 1 && !/[\u4e00-\u9fa5a-zA-Z0-9]/.test(line)) {
+      continue;
+    }
+
+    // 4. Clean repeated decorative dividers (e.g. "|||", "----", "_____")
+    line = line.replace(/[|_~—\-]{2,}/g, ' ');
+
+    // 5. Clean up multiple whitespaces
+    line = line.replace(/\s{2,}/g, ' ').trim();
+
+    if (line.length > 0 && hasValidTextRegex.test(line)) {
+      filteredLines.push(line);
+    }
+  }
+
+  return filteredLines.join('\n');
+}
+
+/**
  * Preprocesses and crops a region from an HTMLVideoElement or HTMLImageElement
  * with precise viewport-to-natural coordinate translation accounting for object-fit (cover / contain).
  */
@@ -20,7 +65,8 @@ export function cropAndPreprocessImage(
   options: {
     enhanceContrast?: boolean;
     binarize?: boolean;
-  } = { enhanceContrast: true, binarize: false }
+    removeNoise?: boolean;
+  } = { enhanceContrast: true, binarize: false, removeNoise: true }
 ): { canvas: HTMLCanvasElement; dataUrl: string } {
   const isVideo = source instanceof HTMLVideoElement;
   const naturalWidth = isVideo ? source.videoWidth : source.naturalWidth;
@@ -49,29 +95,24 @@ export function cropAndPreprocessImage(
     const renderedWidth = naturalWidth * scale;
     const renderedHeight = naturalHeight * scale;
 
-    // CSS object-position defaults to center (50% 50%)
     const offsetX = (cWidth - renderedWidth) / 2;
     const offsetY = (cHeight - renderedHeight) / 2;
 
-    // The crop box coordinates in container pixels
     const screenX = (box.x / 100) * cWidth;
     const screenY = (box.y / 100) * cHeight;
     const screenW = (box.width / 100) * cWidth;
     const screenH = (box.height / 100) * cHeight;
 
-    // Map screen coordinates back to raw unscaled video/image coordinates
     const rawX = (screenX - offsetX) / scale;
     const rawY = (screenY - offsetY) / scale;
     const rawW = screenW / scale;
     const rawH = screenH / scale;
 
-    // Constrain to valid image boundaries
     pixelX = Math.max(0, Math.min(naturalWidth, rawX));
     pixelY = Math.max(0, Math.min(naturalHeight, rawY));
     pixelWidth = Math.max(1, Math.min(naturalWidth - pixelX, rawW));
     pixelHeight = Math.max(1, Math.min(naturalHeight - pixelY, rawH));
   } else {
-    // Fallback if no containerSize is supplied
     pixelX = Math.max(0, Math.round((box.x / 100) * naturalWidth));
     pixelY = Math.max(0, Math.round((box.y / 100) * naturalHeight));
     pixelWidth = Math.min(naturalWidth - pixelX, Math.round((box.width / 100) * naturalWidth));
@@ -108,7 +149,7 @@ export function cropAndPreprocessImage(
     canvas.height
   );
 
-  // Apply contrast / binarization preprocessing if requested
+  // Apply contrast and noise reduction
   if (options.enhanceContrast || options.binarize) {
     try {
       const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -144,7 +185,7 @@ export function cropAndPreprocessImage(
 
       ctx.putImageData(imgData, 0, 0);
     } catch {
-      // In case of any canvas security restriction, proceed with clean cropped image
+      // Proceed if canvas reading is restricted
     }
   }
 
@@ -158,7 +199,8 @@ export function cropAndPreprocessImage(
 export async function recognizeTextLocally(
   imageSource: HTMLCanvasElement | string,
   language: OCRLanguage = 'chi_tra+eng',
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  options: { filterIconsAndNoise?: boolean } = { filterIconsAndNoise: true }
 ): Promise<{ text: string; confidence: number }> {
   try {
     if (!cachedWorker || currentLoadedLang !== language) {
@@ -189,11 +231,18 @@ export async function recognizeTextLocally(
     onProgress?.('完成辨識！', 1);
 
     const rawText = result?.data?.text || '';
-    const cleanedText = rawText
-      .split('\n')
-      .map((line: string) => line.trim())
-      .filter((line: string) => line.length > 0)
-      .join('\n');
+    
+    // Apply icon & non-text filtering if enabled
+    let cleanedText = rawText;
+    if (options.filterIconsAndNoise) {
+      cleanedText = filterNonTextAndIconNoise(rawText);
+    } else {
+      cleanedText = rawText
+        .split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 0)
+        .join('\n');
+    }
 
     return {
       text: cleanedText,

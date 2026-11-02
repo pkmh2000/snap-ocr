@@ -39,6 +39,14 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
   const [progressStatus, setProgressStatus] = useState<string>('');
   const [progressPercent, setProgressPercent] = useState<number>(0);
   const [enhanceContrast, setEnhanceContrast] = useState<boolean>(true);
+  const [filterIcons, setFilterIcons] = useState<boolean>(true);
+  const [showHint, setShowHint] = useState<boolean>(true);
+
+  // Auto-dismiss the center hint after 2.5s
+  React.useEffect(() => {
+    const timer = setTimeout(() => setShowHint(false), 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Handle file select
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,6 +88,7 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
     e.stopPropagation();
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
 
+    setShowHint(false); // Immediately remove the label so text is 100% visible
     setActiveHandle(handleType);
     dragStartRef.current = {
       startX: e.clientX,
@@ -165,13 +174,15 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
         }
       );
 
+      // Local offline OCR with optional non-text/icon noise filtering
       const { text, confidence } = await recognizeTextLocally(
         canvas,
         language,
         (status, progress) => {
           setProgressStatus(status);
           setProgressPercent(progress);
-        }
+        },
+        { filterIconsAndNoise: filterIcons }
       );
 
       // Auto copy
@@ -282,8 +293,9 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
                 {isProcessing && (
                   <div className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_12px_#38bdf8] animate-scan-line pointer-events-none" />
                 )}
-                {!isProcessing && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/70 backdrop-blur-md border border-sky-500/30 text-[11px] font-medium text-sky-200 pointer-events-none shadow-sm">
+                {/* Center Crosshair Hint - auto-dismissed on touch/move to not block text */}
+                {!isProcessing && showHint && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/70 backdrop-blur-md border border-sky-500/30 text-[11px] font-medium text-sky-200 pointer-events-none shadow-sm transition-opacity duration-300">
                     <Sparkles className="w-3 h-3 text-sky-400 animate-pulse" />
                     拖曳縮放選取文字
                   </div>
@@ -356,15 +368,27 @@ export const ImageUploaderView: React.FC<ImageUploaderViewProps> = ({
             >
               更換照片
             </button>
-            <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={enhanceContrast}
-                onChange={(e) => setEnhanceContrast(e.target.checked)}
-                className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0"
-              />
-              <span>高對比強化</span>
-            </label>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filterIcons}
+                  onChange={(e) => setFilterIcons(e.target.checked)}
+                  className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0"
+                />
+                <span className="text-sky-300 font-medium">過濾圖標/雜訊</span>
+              </label>
+
+              <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enhanceContrast}
+                  onChange={(e) => setEnhanceContrast(e.target.checked)}
+                  className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0"
+                />
+                <span>高對比</span>
+              </label>
+            </div>
           </div>
 
           {isProcessing && (
